@@ -145,6 +145,7 @@
         <module>knox-homepage-ui</module>
         <module>gateway-openapi-ui</module>
         <module>knox-token-management-ui</module>
+        <module>sec-utils</module>
     </modules>
 
     <properties>
