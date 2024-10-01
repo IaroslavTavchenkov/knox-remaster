@@ -108,6 +108,8 @@ public class ConfigurableHADispatch extends ConfigurableDispatch {
       disableLoadBalancingForUserAgents = serviceConfig.getStickySessionDisabledUserAgents();
 
       setupUrlHashLookup();
+    } else {
+        LOG.errorConnectingToServer("haProvider", new NullPointerException("haProvider is null"));
     }
 
     /* setup the active URL for non-LB case */
