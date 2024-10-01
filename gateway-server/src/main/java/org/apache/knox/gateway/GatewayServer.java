@@ -172,7 +172,11 @@ public class GatewayServer {
         }
         Map<String,String> options = new HashMap<>();
         options.put(GatewayCommandLine.PERSIST_LONG, Boolean.toString(cmd.hasOption(GatewayCommandLine.PERSIST_LONG)));
-        services.init(config, options);
+        if (services != null) {
+            services.init(config, options);
+        } else {
+            log.failedToInstantiateGatewayServices();
+        }
         if (!cmd.hasOption(GatewayCommandLine.NOSTART_LONG)) {
           startGateway( config, services );
         }
