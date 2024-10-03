@@ -68,303 +68,310 @@ import org.joda.time.format.PeriodFormatter;
 import org.joda.time.format.PeriodFormatterBuilder;
 
 public class DefaultHttpClientFactory implements HttpClientFactory {
-  private static final SpiGatewayMessages LOG = MessagesFactory.get(SpiGatewayMessages.class);
-  private static final String PARAMETER_SERVICE_ROLE = "serviceRole";
-  static final String PARAMETER_USE_TWO_WAY_SSL = "useTwoWaySsl";
-  /* retry in case of NoHttpResponseException */
-  static final String PARAMETER_RETRY_COUNT = "retryCount";
-  static final String PARAMETER_RETRY_NON_SAFE_REQUEST = "retryNonSafeRequest";
-  /* do not retry non-idempotent requests OOTB */
-  static final boolean DEFAULT_PARAMETER_RETRY_NON_SAFE_REQUEST = false;
+    private static final SpiGatewayMessages LOG = MessagesFactory.get(SpiGatewayMessages.class);
+    private static final String PARAMETER_SERVICE_ROLE = "serviceRole";
+    static final String PARAMETER_USE_TWO_WAY_SSL = "useTwoWaySsl";
+    /* retry in case of NoHttpResponseException */
+    static final String PARAMETER_RETRY_COUNT = "retryCount";
+    static final String PARAMETER_RETRY_NON_SAFE_REQUEST = "retryNonSafeRequest";
+    /* do not retry non-idempotent requests OOTB */
+    static final boolean DEFAULT_PARAMETER_RETRY_NON_SAFE_REQUEST = false;
 
-  @Override
-  public HttpClient createHttpClient(FilterConfig filterConfig) {
-    final String serviceRole = filterConfig.getInitParameter(PARAMETER_SERVICE_ROLE);
-    HttpClientBuilder builder;
-    GatewayConfig gatewayConfig = (GatewayConfig) filterConfig.getServletContext().getAttribute(GatewayConfig.GATEWAY_CONFIG_ATTRIBUTE);
-    GatewayServices services = (GatewayServices) filterConfig.getServletContext()
-        .getAttribute(GatewayServices.GATEWAY_SERVICES_ATTRIBUTE);
-    if (gatewayConfig != null && gatewayConfig.isMetricsEnabled()) {
-      MetricsService metricsService = services.getService(ServiceType.METRICS_SERVICE);
-      builder = metricsService.getInstrumented(HttpClientBuilder.class);
-    } else {
-      builder = HttpClients.custom();
-    }
-
-    // Conditionally set a custom SSLContext
-    SSLContext sslContext = createSSLContext(services, filterConfig, serviceRole);
-    if(sslContext != null) {
-      builder.setSSLSocketFactory(new SSLConnectionSocketFactory(sslContext));
-    }
-
-    if (Boolean.parseBoolean(System.getProperty(GatewayConfig.HADOOP_KERBEROS_SECURED))) {
-      CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
-      credentialsProvider.setCredentials(AuthScope.ANY, new UseJaasCredentials());
-
-      Registry<AuthSchemeProvider> authSchemeRegistry = RegistryBuilder.<AuthSchemeProvider>create()
-          .register(AuthSchemes.SPNEGO, new KnoxSpnegoAuthSchemeFactory(true))
-          .build();
-
-      builder.setDefaultAuthSchemeRegistry(authSchemeRegistry)
-          .setDefaultCookieStore(new HadoopAuthCookieStore(gatewayConfig))
-          .setDefaultCredentialsProvider(credentialsProvider);
-    } else {
-      builder.setDefaultCookieStore(new NoCookieStore());
-    }
-
-    builder.setKeepAliveStrategy( DefaultConnectionKeepAliveStrategy.INSTANCE );
-    builder.setConnectionReuseStrategy( DefaultConnectionReuseStrategy.INSTANCE );
-    builder.setRedirectStrategy( new NeverRedirectStrategy() );
-    builder.setRetryHandler( new NeverRetryHandler() );
-
-    int maxConnections = getMaxConnections( filterConfig );
-    builder.setMaxConnTotal( maxConnections );
-    builder.setMaxConnPerRoute( maxConnections );
-
-    builder.setDefaultRequestConfig(getRequestConfig(filterConfig, serviceRole));
-
-    // See KNOX-1530 for details
-    builder.disableContentCompression();
-
-    if (doesRetryParamExist(filterConfig)) {
-      int retryCount = Integer.parseInt(filterConfig.getInitParameter(PARAMETER_RETRY_COUNT));
-      /* do we want to retry non-idempotent requests? default no */
-      boolean retryNonIdempotent = DEFAULT_PARAMETER_RETRY_NON_SAFE_REQUEST;
-      if (filterConfig.getInitParameter(PARAMETER_RETRY_NON_SAFE_REQUEST)
-          != null) {
-        retryNonIdempotent = Boolean.parseBoolean(
-            filterConfig.getInitParameter(PARAMETER_RETRY_NON_SAFE_REQUEST));
-      }
-      builder.setRetryHandler(new DefaultHttpRequestRetryHandler(retryCount,
-          retryNonIdempotent));
-    }
-    return builder.build();
-  }
-
-  private boolean doesRetryParamExist(final FilterConfig filterConfig) {
-    return filterConfig.getInitParameter(PARAMETER_RETRY_COUNT) != null
-        && StringUtils
-        .isNumeric(filterConfig.getInitParameter(PARAMETER_RETRY_COUNT));
-  }
-
-  /**
-   * Conditionally creates a custom {@link SSLContext} based on the Gateway's configuration and whether
-   * two-way SSL is enabled or not.
-   * <p>
-   * If two-way SSL is enabled, then a context with the Gateway's identity and a configured trust store
-   * is created.  The trust store is forced to be the same as the identity's keystore if an explicit
-   * trust store is not configured.
-   * <p>
-   * If two-way SSL is not enabled and an explict trust store is configured, then a context with the
-   * configured trust store is created.
-   * <p>
-   * Else, a custom context is not crated and <code>null</code> is returned.
-   * <p>
-   * This method is package private to allow access to unit tests
-   *
-   * @param services     the {@link GatewayServices}
-   * @param filterConfig a {@link FilterConfig} used to query for parameters for this operation
-   * @param serviceRole the name of the service role to whom this HTTP client is being created for
-   * @return a {@link SSLContext} or <code>null</code> if a custom {@link SSLContext} is not needed.
-   */
-  SSLContext createSSLContext(GatewayServices services, FilterConfig filterConfig, String serviceRole) {
-    KeyStore identityKeystore;
-    char[] identityKeyPassphrase;
-    KeyStore trustKeystore;
-
-    KeystoreService ks = services.getService(ServiceType.KEYSTORE_SERVICE);
-    try {
-      if (Boolean.parseBoolean(filterConfig.getInitParameter(PARAMETER_USE_TWO_WAY_SSL))) {
-        LOG.usingTwoWaySsl(serviceRole);
-        AliasService as = services.getService(ServiceType.ALIAS_SERVICE);
-
-        // Get the Gateway's configured identity keystore and key passphrase
-        identityKeystore = ks.getKeystoreForGateway();
-        identityKeyPassphrase = as.getGatewayIdentityPassphrase();
-
-        // The trustKeystore will be the same as the identityKeystore if a truststore was not explicitly
-        // configured in gateway-site (gateway.truststore.password.alias, gateway.truststore.path, gateway.truststore.type)
-        // This was the behavior before KNOX-1812
-        trustKeystore = ks.getTruststoreForHttpClient();
-        if (trustKeystore == null) {
-          trustKeystore = identityKeystore;
-        }
-      } else {
-        // If not using twoWaySsl, there is no need to calculate the Gateway's identity keystore or
-        // identity key.
-        identityKeystore = null;
-        identityKeyPassphrase = null;
-
-        // The behavior before KNOX-1812 was to use the HttpClients default SslContext. However,
-        // if a truststore was explicitly configured in gateway-site (gateway.truststore.password.alias,
-        // gateway.truststore.path, gateway.truststore.type) create a custom SslContext and use it.
-        trustKeystore = ks.getTruststoreForHttpClient();
-      }
-
-      // If an identity keystore or a trust store needs to be set, create and return a custom
-      // SSLContext; else return null.
-      if ((identityKeystore != null) || (trustKeystore != null)) {
-        SSLContextBuilder sslContextBuilder = SSLContexts.custom();
-
-        if (identityKeystore != null) {
-          sslContextBuilder.loadKeyMaterial(identityKeystore, identityKeyPassphrase);
+    @Override
+    public HttpClient createHttpClient(FilterConfig filterConfig) {
+        final String serviceRole = filterConfig.getInitParameter(PARAMETER_SERVICE_ROLE);
+        HttpClientBuilder builder;
+        GatewayConfig gatewayConfig = (GatewayConfig) filterConfig.getServletContext().getAttribute(GatewayConfig.GATEWAY_CONFIG_ATTRIBUTE);
+        GatewayServices services = (GatewayServices) filterConfig.getServletContext()
+                .getAttribute(GatewayServices.GATEWAY_SERVICES_ATTRIBUTE);
+        if (gatewayConfig != null && gatewayConfig.isMetricsEnabled()) {
+            MetricsService metricsService = services.getService(ServiceType.METRICS_SERVICE);
+            builder = metricsService.getInstrumented(HttpClientBuilder.class);
+        } else {
+            builder = HttpClients.custom();
         }
 
-        if (trustKeystore != null) {
-          sslContextBuilder.loadTrustMaterial(trustKeystore, null);
+        // Conditionally set a custom SSLContext
+        SSLContext sslContext = createSSLContext(services, filterConfig, serviceRole);
+        if (sslContext != null) {
+            builder.setSSLSocketFactory(new SSLConnectionSocketFactory(sslContext));
         }
 
-        return sslContextBuilder.build();
-      } else {
-        return null;
-      }
-    } catch (Exception e) {
-      throw new IllegalArgumentException("Unable to create SSLContext", e);
-    }
-  }
+        if (Boolean.parseBoolean(System.getProperty(GatewayConfig.HADOOP_KERBEROS_SECURED))) {
+            CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
+            credentialsProvider.setCredentials(AuthScope.ANY, new UseJaasCredentials());
 
-  static RequestConfig getRequestConfig(FilterConfig config, String serviceRole) {
-    RequestConfig.Builder builder = RequestConfig.custom();
-    int connectionTimeout = getConnectionTimeout( config );
-    if ( connectionTimeout != -1 ) {
-      builder.setConnectTimeout( connectionTimeout );
-      builder.setConnectionRequestTimeout( connectionTimeout );
-      LOG.setHttpClientConnectionTimeout(connectionTimeout, serviceRole == null ? "N/A" : serviceRole);
-    }
-    int socketTimeout = getSocketTimeout( config );
-    if( socketTimeout != -1 ) {
-      builder.setSocketTimeout( socketTimeout );
-      LOG.setHttpClientSocketTimeout(socketTimeout, serviceRole == null ? "N/A" : serviceRole);
-    }
+            Registry<AuthSchemeProvider> authSchemeRegistry = RegistryBuilder.<AuthSchemeProvider>create()
+                    .register(AuthSchemes.SPNEGO, new KnoxSpnegoAuthSchemeFactory(true))
+                    .build();
 
-    // HttpClient 4.5.7 is broken for %2F handling with url normalization.
-    // However, HttpClient 4.5.8+ (HTTPCLIENT-1968) has reasonable url
-    // normalization that matches what Knox already does related to url handling.
-    //
-    // If this view changes later, need to change here as well as make sure
-    // rest-assured doesn't use the old HttpClient behavior.
-    builder.setNormalizeUri(true);
+            builder.setDefaultAuthSchemeRegistry(authSchemeRegistry);
 
-    return builder.build();
-  }
+            if (gatewayConfig != null) {
+                builder.setDefaultCookieStore(new HadoopAuthCookieStore(gatewayConfig));
+            } else {
+                builder.setDefaultCookieStore(new NoCookieStore());
+            }
 
-  private static class NoCookieStore implements CookieStore {
-    @Override
-    public void addCookie(Cookie cookie) {
-      //no op
-    }
+            builder.setDefaultCredentialsProvider(credentialsProvider);
 
-    @Override
-    public List<Cookie> getCookies() {
-      return Collections.emptyList();
-    }
+        } else {
+            builder.setDefaultCookieStore(new NoCookieStore());
+        }
 
-    @Override
-    public boolean clearExpired(Date date) {
-      return true;
-    }
+        builder.setKeepAliveStrategy(DefaultConnectionKeepAliveStrategy.INSTANCE);
+        builder.setConnectionReuseStrategy(DefaultConnectionReuseStrategy.INSTANCE);
+        builder.setRedirectStrategy(new NeverRedirectStrategy());
+        builder.setRetryHandler(new NeverRetryHandler());
 
-    @Override
-    public void clear() {
-      //no op
-    }
-  }
+        int maxConnections = getMaxConnections(filterConfig);
+        builder.setMaxConnTotal(maxConnections);
+        builder.setMaxConnPerRoute(maxConnections);
 
-  private static class NeverRedirectStrategy implements RedirectStrategy {
-    @Override
-    public boolean isRedirected( HttpRequest request, HttpResponse response, HttpContext context )
-        throws ProtocolException {
-      return false;
+        builder.setDefaultRequestConfig(getRequestConfig(filterConfig, serviceRole));
+
+        // See KNOX-1530 for details
+        builder.disableContentCompression();
+
+        if (doesRetryParamExist(filterConfig)) {
+            int retryCount = Integer.parseInt(filterConfig.getInitParameter(PARAMETER_RETRY_COUNT));
+            /* do we want to retry non-idempotent requests? default no */
+            boolean retryNonIdempotent = DEFAULT_PARAMETER_RETRY_NON_SAFE_REQUEST;
+            if (filterConfig.getInitParameter(PARAMETER_RETRY_NON_SAFE_REQUEST)
+                    != null) {
+                retryNonIdempotent = Boolean.parseBoolean(
+                        filterConfig.getInitParameter(PARAMETER_RETRY_NON_SAFE_REQUEST));
+            }
+            builder.setRetryHandler(new DefaultHttpRequestRetryHandler(retryCount,
+                    retryNonIdempotent));
+        }
+        return builder.build();
     }
 
-    @Override
-    public HttpUriRequest getRedirect( HttpRequest request, HttpResponse response, HttpContext context )
-        throws ProtocolException {
-      return null;
-    }
-  }
-
-  private static class NeverRetryHandler implements HttpRequestRetryHandler {
-    @Override
-    public boolean retryRequest( IOException exception, int executionCount, HttpContext context ) {
-      return false;
-    }
-  }
-
-  private static class UseJaasCredentials implements Credentials {
-
-    @Override
-    public String getPassword() {
-      return null;
+    private boolean doesRetryParamExist(final FilterConfig filterConfig) {
+        return filterConfig.getInitParameter(PARAMETER_RETRY_COUNT) != null
+                && StringUtils
+                .isNumeric(filterConfig.getInitParameter(PARAMETER_RETRY_COUNT));
     }
 
-    @Override
-    public Principal getUserPrincipal() {
-      return null;
+    /**
+     * Conditionally creates a custom {@link SSLContext} based on the Gateway's configuration and whether
+     * two-way SSL is enabled or not.
+     * <p>
+     * If two-way SSL is enabled, then a context with the Gateway's identity and a configured trust store
+     * is created.  The trust store is forced to be the same as the identity's keystore if an explicit
+     * trust store is not configured.
+     * <p>
+     * If two-way SSL is not enabled and an explict trust store is configured, then a context with the
+     * configured trust store is created.
+     * <p>
+     * Else, a custom context is not crated and <code>null</code> is returned.
+     * <p>
+     * This method is package private to allow access to unit tests
+     *
+     * @param services     the {@link GatewayServices}
+     * @param filterConfig a {@link FilterConfig} used to query for parameters for this operation
+     * @param serviceRole  the name of the service role to whom this HTTP client is being created for
+     * @return a {@link SSLContext} or <code>null</code> if a custom {@link SSLContext} is not needed.
+     */
+    SSLContext createSSLContext(GatewayServices services, FilterConfig filterConfig, String serviceRole) {
+        KeyStore identityKeystore;
+        char[] identityKeyPassphrase;
+        KeyStore trustKeystore;
+
+        KeystoreService ks = services.getService(ServiceType.KEYSTORE_SERVICE);
+        try {
+            if (Boolean.parseBoolean(filterConfig.getInitParameter(PARAMETER_USE_TWO_WAY_SSL))) {
+                LOG.usingTwoWaySsl(serviceRole);
+                AliasService as = services.getService(ServiceType.ALIAS_SERVICE);
+
+                // Get the Gateway's configured identity keystore and key passphrase
+                identityKeystore = ks.getKeystoreForGateway();
+                identityKeyPassphrase = as.getGatewayIdentityPassphrase();
+
+                // The trustKeystore will be the same as the identityKeystore if a truststore was not explicitly
+                // configured in gateway-site (gateway.truststore.password.alias, gateway.truststore.path, gateway.truststore.type)
+                // This was the behavior before KNOX-1812
+                trustKeystore = ks.getTruststoreForHttpClient();
+                if (trustKeystore == null) {
+                    trustKeystore = identityKeystore;
+                }
+            } else {
+                // If not using twoWaySsl, there is no need to calculate the Gateway's identity keystore or
+                // identity key.
+                identityKeystore = null;
+                identityKeyPassphrase = null;
+
+                // The behavior before KNOX-1812 was to use the HttpClients default SslContext. However,
+                // if a truststore was explicitly configured in gateway-site (gateway.truststore.password.alias,
+                // gateway.truststore.path, gateway.truststore.type) create a custom SslContext and use it.
+                trustKeystore = ks.getTruststoreForHttpClient();
+            }
+
+            // If an identity keystore or a trust store needs to be set, create and return a custom
+            // SSLContext; else return null.
+            if ((identityKeystore != null) || (trustKeystore != null)) {
+                SSLContextBuilder sslContextBuilder = SSLContexts.custom();
+
+                if (identityKeystore != null) {
+                    sslContextBuilder.loadKeyMaterial(identityKeystore, identityKeyPassphrase);
+                }
+
+                if (trustKeystore != null) {
+                    sslContextBuilder.loadTrustMaterial(trustKeystore, null);
+                }
+
+                return sslContextBuilder.build();
+            } else {
+                return null;
+            }
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Unable to create SSLContext", e);
+        }
     }
 
-  }
+    static RequestConfig getRequestConfig(FilterConfig config, String serviceRole) {
+        RequestConfig.Builder builder = RequestConfig.custom();
+        int connectionTimeout = getConnectionTimeout(config);
+        if (connectionTimeout != -1) {
+            builder.setConnectTimeout(connectionTimeout);
+            builder.setConnectionRequestTimeout(connectionTimeout);
+            LOG.setHttpClientConnectionTimeout(connectionTimeout, serviceRole == null ? "N/A" : serviceRole);
+        }
+        int socketTimeout = getSocketTimeout(config);
+        if (socketTimeout != -1) {
+            builder.setSocketTimeout(socketTimeout);
+            LOG.setHttpClientSocketTimeout(socketTimeout, serviceRole == null ? "N/A" : serviceRole);
+        }
 
-  private int getMaxConnections( FilterConfig filterConfig ) {
-    int maxConnections = 32;
-    GatewayConfig config =
-        (GatewayConfig)filterConfig.getServletContext().getAttribute( GatewayConfig.GATEWAY_CONFIG_ATTRIBUTE );
-    if( config != null ) {
-      maxConnections = config.getHttpClientMaxConnections();
-    }
-    String str = filterConfig.getInitParameter( "httpclient.maxConnections" );
-    if( str != null ) {
-      try {
-        maxConnections = Integer.parseInt( str );
-      } catch ( NumberFormatException e ) {
-        // Ignore it and use the default.
-      }
-    }
-    return maxConnections;
-  }
+        // HttpClient 4.5.7 is broken for %2F handling with url normalization.
+        // However, HttpClient 4.5.8+ (HTTPCLIENT-1968) has reasonable url
+        // normalization that matches what Knox already does related to url handling.
+        //
+        // If this view changes later, need to change here as well as make sure
+        // rest-assured doesn't use the old HttpClient behavior.
+        builder.setNormalizeUri(true);
 
-  private static int getConnectionTimeout( FilterConfig filterConfig ) {
-    int timeout = -1;
-    GatewayConfig globalConfig =
-        (GatewayConfig)filterConfig.getServletContext().getAttribute( GatewayConfig.GATEWAY_CONFIG_ATTRIBUTE );
-    if( globalConfig != null ) {
-      timeout = globalConfig.getHttpClientConnectionTimeout();
+        return builder.build();
     }
-    String str = filterConfig.getInitParameter( "httpclient.connectionTimeout" );
-    if( str != null ) {
-      try {
-        timeout = (int)parseTimeout( str );
-      } catch ( Exception e ) {
-        // Ignore it and use the default.
-      }
-    }
-    return timeout;
-  }
 
-  private static int getSocketTimeout( FilterConfig filterConfig ) {
-    int timeout = -1;
-    GatewayConfig globalConfig =
-        (GatewayConfig)filterConfig.getServletContext().getAttribute( GatewayConfig.GATEWAY_CONFIG_ATTRIBUTE );
-    if( globalConfig != null ) {
-      timeout = globalConfig.getHttpClientSocketTimeout();
-    }
-    String str = filterConfig.getInitParameter( "httpclient.socketTimeout" );
-    if( str != null ) {
-      try {
-        timeout = (int)parseTimeout( str );
-      } catch ( Exception e ) {
-        // Ignore it and use the default.
-      }
-    }
-    return timeout;
-  }
+    private static class NoCookieStore implements CookieStore {
+        @Override
+        public void addCookie(Cookie cookie) {
+            //no op
+        }
 
-  private static long parseTimeout( String s ) {
-    PeriodFormatter f = new PeriodFormatterBuilder()
-        .appendMinutes().appendSuffix("m"," min")
-        .appendSeconds().appendSuffix("s"," sec")
-        .appendMillis().toFormatter();
-    Period p = Period.parse( s, f );
-    return p.toStandardDuration().getMillis();
-  }
+        @Override
+        public List<Cookie> getCookies() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public boolean clearExpired(Date date) {
+            return true;
+        }
+
+        @Override
+        public void clear() {
+            //no op
+        }
+    }
+
+    private static class NeverRedirectStrategy implements RedirectStrategy {
+        @Override
+        public boolean isRedirected(HttpRequest request, HttpResponse response, HttpContext context)
+                throws ProtocolException {
+            return false;
+        }
+
+        @Override
+        public HttpUriRequest getRedirect(HttpRequest request, HttpResponse response, HttpContext context)
+                throws ProtocolException {
+            return null;
+        }
+    }
+
+    private static class NeverRetryHandler implements HttpRequestRetryHandler {
+        @Override
+        public boolean retryRequest(IOException exception, int executionCount, HttpContext context) {
+            return false;
+        }
+    }
+
+    private static class UseJaasCredentials implements Credentials {
+
+        @Override
+        public String getPassword() {
+            return null;
+        }
+
+        @Override
+        public Principal getUserPrincipal() {
+            return null;
+        }
+
+    }
+
+    private int getMaxConnections(FilterConfig filterConfig) {
+        int maxConnections = 32;
+        GatewayConfig config =
+                (GatewayConfig) filterConfig.getServletContext().getAttribute(GatewayConfig.GATEWAY_CONFIG_ATTRIBUTE);
+        if (config != null) {
+            maxConnections = config.getHttpClientMaxConnections();
+        }
+        String str = filterConfig.getInitParameter("httpclient.maxConnections");
+        if (str != null) {
+            try {
+                maxConnections = Integer.parseInt(str);
+            } catch (NumberFormatException e) {
+                // Ignore it and use the default.
+            }
+        }
+        return maxConnections;
+    }
+
+    private static int getConnectionTimeout(FilterConfig filterConfig) {
+        int timeout = -1;
+        GatewayConfig globalConfig =
+                (GatewayConfig) filterConfig.getServletContext().getAttribute(GatewayConfig.GATEWAY_CONFIG_ATTRIBUTE);
+        if (globalConfig != null) {
+            timeout = globalConfig.getHttpClientConnectionTimeout();
+        }
+        String str = filterConfig.getInitParameter("httpclient.connectionTimeout");
+        if (str != null) {
+            try {
+                timeout = (int) parseTimeout(str);
+            } catch (Exception e) {
+                // Ignore it and use the default.
+            }
+        }
+        return timeout;
+    }
+
+    private static int getSocketTimeout(FilterConfig filterConfig) {
+        int timeout = -1;
+        GatewayConfig globalConfig =
+                (GatewayConfig) filterConfig.getServletContext().getAttribute(GatewayConfig.GATEWAY_CONFIG_ATTRIBUTE);
+        if (globalConfig != null) {
+            timeout = globalConfig.getHttpClientSocketTimeout();
+        }
+        String str = filterConfig.getInitParameter("httpclient.socketTimeout");
+        if (str != null) {
+            try {
+                timeout = (int) parseTimeout(str);
+            } catch (Exception e) {
+                // Ignore it and use the default.
+            }
+        }
+        return timeout;
+    }
+
+    private static long parseTimeout(String s) {
+        PeriodFormatter f = new PeriodFormatterBuilder()
+                .appendMinutes().appendSuffix("m", " min")
+                .appendSeconds().appendSuffix("s", " sec")
+                .appendMillis().toFormatter();
+        Period p = Period.parse(s, f);
+        return p.toStandardDuration().getMillis();
+    }
 }

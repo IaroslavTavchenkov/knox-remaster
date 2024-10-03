@@ -44,6 +44,11 @@ public class HadoopAuthCookieStore extends BasicCookieStore {
   private static String shortKnoxPrincipal;
 
   HadoopAuthCookieStore(GatewayConfig config) {
+    if (config == null) {
+      LOG.dispatchServiceConnectionException(null, new IllegalArgumentException("GatewayConfig cannot be null"));
+      return;
+    }
+
     // Read knoxPrincipal from krb5 login jaas config file
     String krb5Config = config.getKerberosLoginConfig();
     if (krb5Config != null && !krb5Config.isEmpty()) {
