@@ -156,12 +156,16 @@ public class SelectCommand extends AbstractSQLCommandSupport implements KeyListe
                 username = dlg.name();
                 pass = dlg.chars();
               }
-              conn = getConnection(ds, username, new String(pass));
-            }
-            try (Statement statement = conn.createStatement()) {
-              if (statement.execute(sql)) {
-                try (ResultSet resultSet = statement.getResultSet()) {
-                  table = KnoxShellTable.builder().jdbc().resultSet(resultSet);
+              if (pass != null) {
+                conn = getConnection(ds, username, new String(pass));
+              } else {
+                return "Password cannot be null.";
+              }
+              try (Statement statement = conn.createStatement()) {
+                if (statement.execute(sql)) {
+                  try (ResultSet resultSet = statement.getResultSet()) {
+                    table = KnoxShellTable.builder().jdbc().resultSet(resultSet);
+                  }
                 }
               }
             }
