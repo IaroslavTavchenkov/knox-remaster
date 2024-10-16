@@ -393,7 +393,7 @@ public class GatewayConfigImpl extends Configuration implements GatewayConfig {
       File file = new File( lastFileUrl.getFile() ).getAbsoluteFile();
       if (file != null) {
         File dir = file.getParentFile().getParentFile(); // Move up two levels to get to parent of conf.
-        if (dir.exists() && dir.canRead()) {
+        if (dir != null && dir.exists() && dir.canRead()) { 
           home = dir.getAbsolutePath();
         }
       }
