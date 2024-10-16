@@ -82,6 +82,9 @@ class KnoxShellTableJSONSerializer {
         jsonResult = JsonUtils.renderAsJsonString(table, filterProvider, JSON_DATE_FORMAT.get());
       } else {
         jsonResult = JsonUtils.renderAsJsonString(KnoxShellTableCallHistory.getInstance().getCallHistory(table.id), null, JSON_DATE_FORMAT.get());
+      }      
+      if (jsonResult == null) {
+        throw new KnoxShellException("JSON result is null, cannot save to file.");
       }
       KnoxShellTableFileUtils.persistToFile(filePath, jsonResult);
       return "Successfully saved into " + filePath;
