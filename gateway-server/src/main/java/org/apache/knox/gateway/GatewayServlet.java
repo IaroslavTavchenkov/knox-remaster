@@ -215,7 +215,7 @@ public class GatewayServlet implements Servlet, Filter {
       if (gatewayConfig.isMetricsEnabled()) {
         GatewayServices gatewayServices = (GatewayServices) servletContext.getAttribute(GatewayServices.GATEWAY_SERVICES_ATTRIBUTE);
         MetricsService metricsService = gatewayServices.getService(ServiceType.METRICS_SERVICE);
-        if (metricsService != null) {
+        if (metricsService != null && filter != null) {
           GatewayFilter instrumentedFilter = metricsService.getInstrumented(filter);
           if (instrumentedFilter != null) {
             filter = instrumentedFilter;
