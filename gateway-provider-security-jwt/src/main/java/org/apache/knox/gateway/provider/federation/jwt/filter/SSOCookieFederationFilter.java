@@ -221,6 +221,10 @@ public class SSOCookieFederationFilter extends AbstractJWTFilter {
     else {
       providerURL = authenticationProviderUrl;
     }
+    if (providerURL == null) {
+      LOGGER.failedToDeriveAuthenticationProviderUrl(new Exception("Provider  URL is null"));
+      return "";
+    }
     if (providerURL.contains("?")) {
       delimiter = "&";
     }
