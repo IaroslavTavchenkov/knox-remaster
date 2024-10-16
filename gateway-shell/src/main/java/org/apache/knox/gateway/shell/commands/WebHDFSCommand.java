@@ -301,6 +301,10 @@ public class WebHDFSCommand extends AbstractKnoxShellCommand {
   }
 
   private void unmount(Map<String, String> mounts, String mountPoint) {
+    if (mounts == null) {
+        System.out.println("Mounts map is null. Cannot unmount.");
+        return;
+    }
     sessions.remove(mountPoint);
     mounts.remove(mountPoint);
     KnoxSession.persistMountPoints(mounts);
