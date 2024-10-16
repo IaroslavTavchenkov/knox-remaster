@@ -99,7 +99,11 @@ public class DataSourceCommand extends AbstractSQLCommandSupport {
             pass = dlg.chars();
           }
           try {
-            getConnection(dsValue, username, new String(pass));
+            if (pass != null) {
+              getConnection(dsValue, username, new String(pass));
+            } else {
+              return "Error: Password cannot be null.";
+            }
           } catch (Exception e) {
             e.printStackTrace();
             return "Error: Connection creation failure.";
