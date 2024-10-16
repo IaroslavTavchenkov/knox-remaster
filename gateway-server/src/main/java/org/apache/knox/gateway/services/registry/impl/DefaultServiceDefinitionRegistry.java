@@ -266,7 +266,7 @@ public class DefaultServiceDefinitionRegistry implements ServiceDefinitionRegist
     // removed too
     final Path serviceFolderPath = Paths.get(gatewayConfig.getGatewayServicesDir(), name).toAbsolutePath();
     final File serviceFolder = serviceFolderPath.toFile();
-    if (serviceFolder.isDirectory() && serviceFolder.listFiles().length == 0) {
+    if (serviceFolder.isDirectory() && serviceFolder.listFiles() != null && serviceFolder.listFiles().length == 0) {
       Files.delete(serviceFolderPath);
     }
   }
