@@ -262,7 +262,7 @@ public class ConfigurableHADispatch extends ConfigurableDispatch {
               **/
               final List<String> urls = haProvider.getURLs(getServiceRole())
                       .stream()
-                      .filter(u -> u.contains(outboundRequest.getURI().getHost()))
+                      .filter(u -> outboundRequest.getURI().getHost() != null && u.contains(outboundRequest.getURI().getHost()))
                       .collect(Collectors.toList());
 
               final String cookieValue = urlToHashLookup.get(urls.get(0));
