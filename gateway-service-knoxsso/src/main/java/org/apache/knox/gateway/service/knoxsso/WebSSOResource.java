@@ -308,6 +308,9 @@ public class WebSSOResource {
 
   private String getOriginalUrlFromQueryParams() {
     String original = request.getParameter(ORIGINAL_URL_REQUEST_PARAM);
+    if (original == null) {
+        original = "";
+    }
     StringBuilder buf = new StringBuilder(original);
 
     boolean first = true;
