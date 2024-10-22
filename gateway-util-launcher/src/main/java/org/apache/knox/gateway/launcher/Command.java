@@ -121,11 +121,13 @@ class Command {
         urls.add( libFile.toURI().toURL() );
       } else if( libPath.endsWith( "*" ) || libPath.endsWith( "*.jar" ) ) {
         File libDir = libFile.getParentFile();
-        File[] libFiles = libDir.listFiles( new WildcardFilenameFilter( libFile.getName() ) );
-        if( libFiles != null ) {
-          for( File file : libFiles ) {
-            urls.add( file.toURI().toURL() );
-          }
+        if (libDir != null) {
+            File[] libFiles = libDir.listFiles( new WildcardFilenameFilter( libFile.getName() ) );
+            if( libFiles != null ) {
+              for( File file : libFiles ) {
+                urls.add( file.toURI().toURL() );
+              }
+            }
         }
       }
     }
