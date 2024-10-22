@@ -70,7 +70,8 @@ public class BasicResponse implements Closeable {
   }
 
   public String getContentEncoding() {
-    return ContentType.getOrDefault( response.getEntity() ).getCharset().name();
+    ContentType contentType = ContentType.getOrDefault(response.getEntity());
+    return contentType.getCharset() != null ? contentType.getCharset().name() : null;
   }
 
   public InputStream getStream() throws IOException {
