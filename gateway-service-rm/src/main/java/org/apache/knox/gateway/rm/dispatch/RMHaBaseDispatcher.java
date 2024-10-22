@@ -158,8 +158,11 @@ class  RMHaBaseDispatcher extends DefaultDispatch {
             if( inboundResponse != null ) {
                // We get redirection URI, failover condition we don't
                // need to consult list of host.
-               String host = inboundResponse.getFirstHeader(LOCATION).getValue();
-               LOG.failoverRedirect(host);
+               String host = null; // Declare host variable
+               if (inboundResponse.getFirstHeader(LOCATION) != null) {
+                   host = inboundResponse.getFirstHeader(LOCATION).getValue();
+                   // LOG.failoverRedirect(host); // Logging removed as per request
+               }
                uri = URI.create(host);
             } else { // inboundRequest was null previous active node is down
                      // get next URI in list to try.
