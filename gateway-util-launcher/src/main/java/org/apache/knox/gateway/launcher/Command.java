@@ -67,8 +67,9 @@ class Command {
     config.remove( MAIN_METHOD );
     mainArgs = loadMainArgs( mainArgs, config.getProperty( MAIN_ARGS ) );
     config.remove( MAIN_ARGS );
-    classPath = loadClassPath( base, config.getProperty( CLASS_PATH ) );
-    config.remove( CLASS_PATH );
+    String classPathValue = config.getProperty(CLASS_PATH);
+    classPath = loadClassPath(base, classPathValue != null ? classPathValue : "");
+    config.remove(CLASS_PATH);
     fork = Boolean.valueOf( config.getProperty( FORK, fork.toString() ) );
     config.remove( FORK );
     redirect = Boolean.valueOf( config.getProperty( REDIRECT, redirect.toString() ) );
