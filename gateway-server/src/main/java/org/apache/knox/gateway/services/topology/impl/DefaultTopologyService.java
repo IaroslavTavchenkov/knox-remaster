@@ -246,9 +246,14 @@ public class DefaultTopologyService extends FileAlterationListenerAdaptor implem
     File configDir;
 
     String path = config.getGatewayConfDir();
-    configDir = (path != null) ? new File(path) : (new File(config.getGatewayTopologyDir())).getParentFile();
+    if (path != null) {
+      configDir = new File(path);
+    } else {
+      String topologyDir = config.getGatewayTopologyDir();
+      configDir = (topologyDir != null) ? new File(topologyDir).getParentFile() : null;
+    }
 
-    return configDir.getAbsoluteFile();
+    return (configDir != null) ? configDir.getAbsoluteFile() : null;
   }
 
   private void initListener(String monitorName, FileAlterationMonitor monitor, File directory, FileFilter filter, FileAlterationListener listener) {
