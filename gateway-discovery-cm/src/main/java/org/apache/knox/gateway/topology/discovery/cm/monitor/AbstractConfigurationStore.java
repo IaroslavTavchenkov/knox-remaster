@@ -62,7 +62,11 @@ public abstract class AbstractConfigurationStore {
 
   protected File getPersistenceFile(final String address, final String clusterName, final String ext) {
     String fileName = address.replace(":", "_").replace("/", "_") + "-" + clusterName + "." + ext;
-    return getPersistenceDir().resolve(fileName).toFile();
+    Path persistenceDir = getPersistenceDir();
+    if (persistenceDir != null) {
+      return persistenceDir.resolve(fileName).toFile();
+    }
+    throw new IllegalStateException("Persistence directory is not available");
   }
 
   protected Path getPersistenceDir() {
