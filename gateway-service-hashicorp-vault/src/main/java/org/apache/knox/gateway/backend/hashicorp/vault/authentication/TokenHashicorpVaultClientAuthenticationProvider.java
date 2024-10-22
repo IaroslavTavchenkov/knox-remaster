@@ -55,7 +55,11 @@ public class TokenHashicorpVaultClientAuthenticationProvider
     if(vaultToken.startsWith("${ALIAS=") && vaultToken.endsWith("}")) {
       // Strip off ${ALIAS= and } from the value before looking it up
       String vaultTokenAlias = vaultToken.substring(8, vaultToken.length()-1);
-      return new String(localAliasService.getPasswordFromAliasForGateway(vaultTokenAlias));
+      String password = new String(localAliasService.getPasswordFromAliasForGateway(vaultTokenAlias));
+      if (password == null) {
+          throw new Exception("Vault token alias not found: " + vaultTokenAlias);
+      }
+      return password; // Return the password if it's not null
     }
     return vaultToken;
   }
