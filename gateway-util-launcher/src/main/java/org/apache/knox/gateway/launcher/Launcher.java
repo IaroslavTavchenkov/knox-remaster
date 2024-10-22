@@ -72,7 +72,11 @@ public class Launcher {
   }
 
   void run() throws ClassNotFoundException, InvocationTargetException, NoSuchMethodException, IllegalAccessException {
-    command.run();
+    if (command != null) {
+      command.run();
+    } else {
+      throw new IllegalStateException("Command is not initialized.");
+    }
   }
 
   private static URL findLauncherJar() {
