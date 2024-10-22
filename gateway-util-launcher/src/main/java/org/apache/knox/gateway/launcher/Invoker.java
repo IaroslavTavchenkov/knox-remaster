@@ -70,6 +70,9 @@ class Invoker {
 
   private static String resolveValue( Properties properties, String name ) {
     String value = properties.getProperty( name );
+    if (value == null) {
+        return null; // или обработка случая, когда значение отсутствует
+    }
     Pattern pattern = Pattern.compile( ".*?(\\$\\{)(.*?)(\\}).*" );
     Matcher matcher = pattern.matcher( value );
     while( matcher.matches() ) {
