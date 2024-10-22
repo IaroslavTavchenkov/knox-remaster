@@ -790,10 +790,6 @@ public class KnoxCLI extends Configured implements Tool {
            ks.addSelfSignedCertForGateway(config.getIdentityKeyAlias(), passphrase, hostname);
 //         logAndValidateCertificate();
            out.println("Certificate " + config.getIdentityKeyAlias() + " has been successfully created.");
-         } else {
-           // require --force to replace...
-           out.println("A non-self-signed certificate has already been installed in the configured keystore. " +
-               "Please use --force if you wish to overwrite it with a generated self-signed certificate.");
          }
        } catch (KeystoreServiceException e) {
          throw new ServiceLifecycleException("The identity keystore was not loaded properly - the provided password may not match the password for the keystore.", e);
@@ -1423,6 +1419,10 @@ public class KnoxCLI extends Configured implements Tool {
       try {
 //        Pull out contextFactory.url param for light shiro config
         Provider shiro = t.getProvider("authentication", "ShiroProvider");
+        if (shiro == null) {
+            out.println("ERR: ShiroProvider not found in the topology.");
+            return false; // или обработка ошибки
+        }
         Map<String, String> params = shiro.getParams();
         String url = params.get("main.ldapRealm.contextFactory.url");
 
