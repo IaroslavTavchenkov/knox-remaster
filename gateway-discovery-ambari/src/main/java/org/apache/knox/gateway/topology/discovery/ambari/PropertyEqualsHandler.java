@@ -91,7 +91,10 @@ class PropertyEqualsHandler implements ConditionalValueHandler {
                 value = component.getConfigProperty(property.getValue());
             }
         } else if (ServiceURLPropertyConfig.Property.TYPE_SERVICE.equals(propertyType)) {
-            value = cluster.getServiceConfiguration(property.getService(), property.getServiceConfig()).getProperties().get(property.getValue());
+            AmbariCluster.ServiceConfiguration serviceConfig = cluster.getServiceConfiguration(property.getService(), property.getServiceConfig());
+            if (serviceConfig != null) {
+                value = serviceConfig.getProperties().get(property.getValue());
+            }
         }
         return value;
     }
