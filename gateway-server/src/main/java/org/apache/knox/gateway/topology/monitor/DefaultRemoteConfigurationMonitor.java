@@ -166,7 +166,12 @@ class DefaultRemoteConfigurationMonitor implements RemoteConfigurationMonitor {
             for (String providerConfig : providerConfigs) {
                 File localFile = new File(providersDir, providerConfig);
 
-                byte[] remoteContent = client.getEntryData(NODE_KNOX_PROVIDERS + "/" + providerConfig).getBytes(StandardCharsets.UTF_8);
+                String entryData = client.getEntryData(NODE_KNOX_PROVIDERS + "/" + providerConfig);
+                if (entryData == null) {
+                    throw new IllegalStateException("Entry data for provider config " + providerConfig + " is null.");
+                }
+
+                byte[] remoteContent = entryData.getBytes(StandardCharsets.UTF_8);
                 if (!localFile.exists() || !Arrays.equals(remoteContent, FileUtils.readFileToByteArray(localFile))) {
                     FileUtils.writeByteArrayToFile(localFile, remoteContent);
                     log.downloadedRemoteConfigFile(providersDir.getName(), providerConfig);
