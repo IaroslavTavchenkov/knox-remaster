@@ -1138,17 +1138,20 @@ public class KnoxCLI extends Configured implements Tool {
         // The following block of code retreieves the list of files in the topologies directory
         File tops = new File(topDir + "/topologies");
         if(tops.isDirectory()) {
-          out.println("List of files available in the topologies directory");
-          for (File f : tops.listFiles()) {
-            if(f.getName().endsWith(".xml")) {
-              String fName = f.getName().replace(".xml", "");
-              out.println(fName);
+          File[] files = tops.listFiles(); // Получаем список файлов
+          if (files != null) { // Проверяем на null
+            out.println("List of files available in the topologies directory");
+            for (File f : files) {
+              if(f.getName().endsWith(".xml")) {
+                String fName = f.getName().replace(".xml", "");
+                out.println(fName);
+              }
             }
+          } else {
+            out.println("No files found in the topologies directory or an error occurred.");
           }
-          return;
         } else {
           out.println("Could not locate topologies directory");
-          return;
         }
 
       } else {
@@ -1197,16 +1200,19 @@ public class KnoxCLI extends Configured implements Tool {
       out.println("List of files available in the topologies directory");
       out.println(tops.toString());
       if(tops.isDirectory()) {
-        for (File f : tops.listFiles()) {
-          if(f.getName().endsWith(".xml")) {
-            String fName = f.getName().replace(".xml", "");
-            out.println(fName);
+        File[] files = tops.listFiles(); // Получаем список файлов
+        if (files != null) { // Проверяем на null
+          for (File f : files) {
+            if(f.getName().endsWith(".xml")) {
+              String fName = f.getName().replace(".xml", "");
+              out.println(fName);
+            }
           }
+        } else {
+          out.println("No files found in the topologies directory or an error occurred.");
         }
-        return;
       } else {
         out.println("ERR: Topologies directory does not exist.");
-        return;
       }
 
     }
