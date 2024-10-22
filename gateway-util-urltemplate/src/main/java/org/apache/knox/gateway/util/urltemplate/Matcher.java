@@ -332,7 +332,7 @@ public class Matcher<V> {
   private void extractSegmentParams( Segment extractSegment, Segment inputSegment, MatchParams params ) {
     if( extractSegment != null && inputSegment != null ) {
       String paramName = extractSegment.getParamName();
-      if(!paramName.isEmpty()) {
+      if(paramName != null && !paramName.isEmpty()) {
         for( Segment.Value value: inputSegment.getValues() ) {
           params.insertValue( paramName, value.getEffectivePattern() );
         }
