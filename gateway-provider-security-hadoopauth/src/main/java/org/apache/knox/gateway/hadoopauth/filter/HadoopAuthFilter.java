@@ -358,8 +358,11 @@ public class HadoopAuthFilter extends
     while (names.hasMoreElements()) {
       String name = names.nextElement();
       if (name.startsWith(configPrefix)) {
-        String value = handleAlias(aliasService, filterConfig, filterConfig.getInitParameter(name), name);
-        props.put(name.substring(configPrefix.length()), value);
+        String initParamValue = filterConfig.getInitParameter(name);
+        if (initParamValue != null) {
+          String value = handleAlias(aliasService, filterConfig, initParamValue, name);
+          props.put(name.substring(configPrefix.length()), value);
+        }
       }
     }
     return props;
