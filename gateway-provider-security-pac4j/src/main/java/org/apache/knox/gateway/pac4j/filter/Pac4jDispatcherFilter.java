@@ -248,7 +248,11 @@ public class Pac4jDispatcherFilter implements Filter {
     if (value.startsWith(ALIAS_PREFIX) && value.endsWith("}")) {
       String alias = value.substring(ALIAS_PREFIX.length(), value.length() - 1);
       try {
-        return new String(aliasService.getPasswordFromAliasForCluster(clusterName, alias));
+        char[] password = aliasService.getPasswordFromAliasForCluster(clusterName, alias);
+        if (password == null) {
+          throw new ServletException("Password for alias " + alias + " is null.");
+        }
+        return new String(password);
       } catch (AliasServiceException e) {
         throw new ServletException("Unable to retrieve alias for config: " + key, e);
       }
