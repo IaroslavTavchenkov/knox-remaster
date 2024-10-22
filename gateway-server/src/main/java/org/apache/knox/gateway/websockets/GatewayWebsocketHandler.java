@@ -179,6 +179,9 @@ public class GatewayWebsocketHandler extends WebSocketHandler
    */
   protected synchronized String getMatchedBackendURL(final URI requestURI) {
     final String path = requestURI.getRawPath();
+    if (path == null) {
+        throw new IllegalArgumentException("Request URI path cannot be null");
+    }
     final String query = requestURI.getRawQuery();
 
     final ServiceRegistry serviceRegistryService = services
