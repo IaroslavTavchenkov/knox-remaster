@@ -201,6 +201,10 @@ public class DefaultAliasService extends AbstractAliasService {
     final Map<String, char[]> passwordAliasMap = new HashMap<>();
     try {
       final KeyStore gatewayCredentialStore = keystoreService.getCredentialStoreForCluster(NO_CLUSTER_NAME);
+      if (gatewayCredentialStore == null) {
+        System.err.println("Credential store for gateway is null.");
+        return new HashMap<>();
+      }
       final Enumeration<String> aliases = gatewayCredentialStore.aliases();
       String alias;
       while (aliases.hasMoreElements()) {
