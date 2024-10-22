@@ -72,9 +72,11 @@ class TraceRequest extends HttpServletRequestWrapper {
       while( names.hasMoreElements() ) {
         String name = names.nextElement();
         Enumeration<String> values = getHeaders( name );
-        while( values.hasMoreElements() ) {
-          String value = values.nextElement();
-          sb.append( String.format(Locale.ROOT, "%n\tHeader[%s]=%s", name, value ) );
+        if (values != null) {
+          while( values.hasMoreElements() ) {
+            String value = values.nextElement();
+            sb.append( String.format(Locale.ROOT, "%n\tHeader[%s]=%s", name, value ) );
+          }
         }
       }
     }
