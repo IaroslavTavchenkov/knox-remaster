@@ -572,7 +572,10 @@ public class TokenResource {
     } else {
       try {
         final TokenMetadata tokenMetadata = tokenStateService.getTokenMetadata(tokenId);
-        if (enabled && tokenMetadata.isEnabled()) {
+        if (tokenMetadata == null) {
+          error = "Token metadata not found";
+          errorCode = ErrorCode.UNKNOWN_TOKEN;
+        } else if (enabled && tokenMetadata.isEnabled()) {
           error = "Token is already enabled";
           errorCode = ErrorCode.ALREADY_ENABLED;
         } else if (!enabled && !tokenMetadata.isEnabled()) {
