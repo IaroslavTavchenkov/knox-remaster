@@ -683,16 +683,18 @@ public class DefaultTopologyService extends FileAlterationListenerAdaptor implem
       RemoteConfigurationRegistryClient client = remoteMonitor.getClient();
       if (client != null) {
         List<String> existingProviderConfigs = client.listChildEntries(entryParent);
-        for (String entryName : existingProviderConfigs) {
-          if (FilenameUtils.getBaseName(entryName).equals(name)) {
-            String entryPath = entryParent + "/" + entryName;
-            client.deleteEntry(entryPath);
-            result = !client.entryExists(entryPath);
-            if (!result) {
-              log.failedToDeletedRemoteConfigFile("descriptor", name);
+        if (existingProviderConfigs != null) {
+            for (String entryName : existingProviderConfigs) {
+                if (FilenameUtils.getBaseName(entryName).equals(name)) {
+                    String entryPath = entryParent + "/" + entryName;
+                    client.deleteEntry(entryPath);
+                    result = !client.entryExists(entryPath);
+                    if (!result) {
+                        log.failedToDeletedRemoteConfigFile("descriptor", name);
+                    }
+                    break;
+                }
             }
-            break;
-          }
         }
       }
     }
