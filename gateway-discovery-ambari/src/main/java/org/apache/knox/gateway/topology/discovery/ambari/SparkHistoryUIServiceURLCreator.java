@@ -61,7 +61,11 @@ public class SparkHistoryUIServiceURLCreator extends SparkCommonServiceURLCreato
 
   @Override
   boolean isSSL(AmbariComponent comp) {
-    return Boolean.valueOf(comp.getConfigProperty(SSL_FLAG_PRIMARY)) || Boolean.valueOf(comp.getConfigProperty(SSL_FLAG_SECONDARY));
+    String primarySslConfig = comp.getConfigProperty(SSL_FLAG_PRIMARY);
+    String secondarySslConfig = comp.getConfigProperty(SSL_FLAG_SECONDARY);
+    
+    return Boolean.valueOf("true".equalsIgnoreCase(primarySslConfig)) || 
+           Boolean.valueOf("true".equalsIgnoreCase(secondarySslConfig));
   }
 
 }
