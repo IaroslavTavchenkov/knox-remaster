@@ -55,6 +55,9 @@ public class Launcher {
   Launcher( String[] args ) throws IOException {
     launcherJarUrl = findLauncherJar();
     launcherJarDir = calcLauncherDir( launcherJarUrl );
+    if (launcherJarDir == null) {
+        throw new IllegalStateException("Launcher directory cannot be null.");
+    }
     launcherName = calcLauncherName( launcherJarUrl );
     embeddedConfigUrl = findEmbeddedConfig();
     Properties properties = new Properties();
